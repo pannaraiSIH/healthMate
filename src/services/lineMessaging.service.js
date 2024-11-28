@@ -1,5 +1,9 @@
 const axiosInstance = require("../utils/axiosInstance");
 const LINE_REPLY_URL = "https://api.line.me/v2/bot/message/reply";
+const headers = {
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${process.env?.CHANNEL_ACCESS_TOKEN}`,
+};
 
 const getImageContent = async ({ messageId = "", returnType = "base64" }) => {
   try {
@@ -9,7 +13,7 @@ const getImageContent = async ({ messageId = "", returnType = "base64" }) => {
       method: "get",
       url: url,
       responseType: "arraybuffer",
-      headers: { Authorization: `Bearer ${process.env.CHANNEL_SECRET_TOKEN}` },
+      headers,
     });
     if (returnType === "base64") {
       const base64Image = Buffer.from(response.data, "binary").toString(
@@ -29,21 +33,11 @@ const getImageContent = async ({ messageId = "", returnType = "base64" }) => {
 };
 
 const getUserProfile = async (lineID) => {
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env?.CHANNEL_SECRET_TOKEN}`,
-  };
   const response = await axiosInstance.get(
     `https://api.line.me/v2/bot/profile/${lineID}`,
     { headers }
   );
-  return {
-    displayName: response.data?.displayName,
-    userId: response.data?.userId,
-    language: response.data?.language,
-    pictureUrl: response.data?.pictureUrl,
-    statusMessage: response.data?.statusMessage,
-  };
+  return response;
 };
 
 const replyMessage = async ({
@@ -53,10 +47,6 @@ const replyMessage = async ({
   replyToken = "",
   altText = "",
 }) => {
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env?.CHANNEL_SECRET_TOKEN}`,
-  };
   const data = {
     replyToken: replyToken,
     messages: [
@@ -80,32 +70,81 @@ const replyMessage = async ({
   }
 };
 
-const pushMessageToGroup = async ({
-  to = "C46ceb557ffae26f6924737a8bc26b54e",
+const pushMessage = async ({
+  to = "",
   messageText = "",
+  messageType = "text",
+  altText = "",
+  contents = {},
 }) => {
-  const headers = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env?.CHANNEL_SECRET_TOKEN}`,
-  };
-
   try {
-    await axiosInstance.post(
-      "https://api.line.me/v2/bot/message/push",
+    const data = {
+      to: to,
+      messages: [
+        messageType === "text"
+          ? { type: "text", text: messageText }
+          : {
+              type: messageType,
+              altText,
+              contents,
+            },
+      ],
+    };
+    await axiosInstance.post("https://api.line.me/v2/bot/message/push", data, {
+      headers,
+    });
+    return { status: "success" };
+  } catch (error) {
+    console.error("Error pushing message:", error);
+    throw error;
+  }
+};
+
+const quickReply = async ({ to = "", replyToken = "" }) => {
+  try {
+    const response = await axiosInstance.post(
+      "https://api.line.me/v2/bot/message/reply",
       {
-        to: to,
+        replyToken,
         messages: [
           {
             type: "text",
-            text: messageText,
+            text: "คุณลูกค้าต้องการถามข้อมูลด้านไหนบ้างคะ?",
+            quickReply: {
+              items: [
+                {
+                  type: "action",
+                  action: {
+                    type: "message",
+                    label: "ใช้สิทธิบัตรทอง",
+                    text: "สามารถใช้สิทธิบัตรทองที่ร้าน HealthMate ได้อย่างไร?",
+                  },
+                },
+                {
+                  type: "action",
+                  action: {
+                    type: "message",
+                    label: "คำแนะนำอาการป่วย",
+                    text: "HealthMate ให้คำแนะนำเกี่ยวกับอาการป่วยแบบไหนบ้าง?",
+                  },
+                },
+                {
+                  type: "action",
+                  action: {
+                    type: "message",
+                    label: "โครงการที่เข้าร่วม",
+                    text: "ร้าน HealthMate เข้าร่วมโครงการอะไรบ้าง?",
+                  },
+                },
+              ],
+            },
           },
         ],
       },
       { headers }
     );
-    return { status: "success" };
+    return response;
   } catch (error) {
-    console.error("Error pushing message:", error);
     throw error;
   }
 };
@@ -114,5 +153,6 @@ module.exports = {
   replyMessage,
   getUserProfile,
   getImageContent,
-  pushMessageToGroup,
+  pushMessage,
+  quickReply,
 };

@@ -6,14 +6,14 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.response.use(
   (response) => {
-    return response;
+    return response.data;
   },
   (error) => {
     if (error.response) {
-      return {
+      return Promise.reject({
         ...error.response,
         status: error.response.status,
-      };
+      });
     }
 
     return Promise.reject(error);
